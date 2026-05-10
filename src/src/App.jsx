@@ -103,7 +103,11 @@ Jamais de labels ou métadonnées dans la réponse. Direct, puissant, plein d'es
 async function ai(prompt, max=1000) {
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST", headers:{"Content-Type":"application/json"},
+      method:"POST", headers:{
+  "Content-Type":"application/json",
+  "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY,
+  "anthropic-version": "2023-06-01"
+},
       body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:max, system:SYS, messages:[{role:"user",content:prompt}] }),
     });
     return (await r.json()).content?.[0]?.text ?? "Erreur.";
