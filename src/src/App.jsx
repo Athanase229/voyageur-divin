@@ -417,7 +417,7 @@ function ProgramsTab({userId,token}){
     <div style={{paddingTop:22}}>
       <button onClick={()=>setView("list")} style={{background:"transparent",border:`1px solid ${T.goldBorder}`,borderRadius:20,color:T.gold,fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,cursor:"pointer",marginBottom:18,padding:"6px 14px",display:"flex",alignItems:"center",gap:6}}>‹ Retour</button>
       <h2 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:16,color:"#2D1A6E",marginBottom:4}}>Nouveau programme</h2>
-      <p style={{fontFamily:"'EB Garamond',serif",fontSize:14,fontStyle:"italic",color:T.textSub,marginBottom:22}}>Parcours de prière de 7 jours personnalisé par l'IA</p>
+      <p style={{fontFamily:"'EB Garamond',serif",fontSize:14,fontStyle:"italic",color:T.textSub,marginBottom:22}}>On te prépare un Parcours de prière de 7 jours pour régler ton problème</p>
       <SL>Ta situation</SL>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:7,marginBottom:22}}>
         {SITS.map(s=>{const on=sit===s.label;return <button key={s.label} onClick={()=>setSit(s.label)} style={{background:on?`${s.c}14`:T.card,border:`1px solid ${on?s.c+"55":T.cardBorder}`,borderRadius:11,padding:"11px",cursor:"pointer",display:"flex",alignItems:"center",gap:9,transition:"all .2s",boxShadow:on?`0 2px 12px ${s.c}22`:T.cardShadow}}><span style={{fontSize:20}}>{s.icon}</span><span style={{fontFamily:"'EB Garamond',serif",fontSize:13.5,color:on?s.c:T.textSub,lineHeight:1.3}}>{s.label}</span></button>;})}
