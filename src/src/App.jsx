@@ -506,7 +506,7 @@ export default function App(){
           {tab===1&&<ProgramsTab userId={user.id} token={session.access_token}/>}
         </div>
         <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:T.nav,borderTop:`1px solid ${T.navBorder}`,padding:"9px 0 15px",textAlign:"center"}}>
-          <p style={{fontFamily:"'Cinzel',serif",fontSize:8,letterSpacing:3,color:"rgba(212,175,55,.35)",textTransform:"uppercase"}}>✦ Voyageur Divin · {user.email} ✦</p>
+          <p style={{fontFamily:"'Cinzel',serif",fontSize:8,letterSpacing:3,color:"rgba(212,175,55,.35)",textTransform:"uppercase"}}>✦ Voyageur Divine · {user.email} ✦</p>
         </div>
       </div>
     </>
