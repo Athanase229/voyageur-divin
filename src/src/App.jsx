@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 
-// ── SUPABASE REST (sans librairie) ────────────────────────────────────────────
+// ── SUPABASE REST ─────────────────────────────────────────────────────────────
 const SB_URL = "https://rsrvadoynpfdviyafxoq.supabase.co";
 const SB_KEY = "sb_publishable_9kbxLe24iO6CMp3QyADFcw_uOycSt79";
+const ADMIN_EMAIL = "aaloyi@gmail.com"; // ← Mets ton email ici
 
 const authHeaders = (token) => ({
   "Content-Type": "application/json",
@@ -12,61 +13,70 @@ const authHeaders = (token) => ({
 
 const Auth = {
   async signUp(email, password, name) {
-    const r = await fetch(`${SB_URL}/auth/v1/signup`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ email, password, data: { full_name: name } }),
-    });
+    const r = await fetch(`${SB_URL}/auth/v1/signup`, { method:"POST", headers:authHeaders(), body:JSON.stringify({email,password,data:{full_name:name}}) });
     return r.json();
   },
   async signIn(email, password) {
-    const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ email, password }),
-    });
+    const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, { method:"POST", headers:authHeaders(), body:JSON.stringify({email,password}) });
     return r.json();
   },
-  async signOut(token) {
-    await fetch(`${SB_URL}/auth/v1/logout`, {
-      method: "POST",
-      headers: authHeaders(token),
-    });
-  },
+  async signOut(token) { await fetch(`${SB_URL}/auth/v1/logout`, {method:"POST",headers:authHeaders(token)}); },
   async resetPassword(email) {
-    const r = await fetch(`${SB_URL}/auth/v1/recover`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ email }),
-    });
+    const r = await fetch(`${SB_URL}/auth/v1/recover`, {method:"POST",headers:authHeaders(),body:JSON.stringify({email})});
     return r.json();
   },
-  getSession() {
-    try { return JSON.parse(localStorage.getItem("vd_session")); } catch { return null; }
-  },
+  getSession() { try { return JSON.parse(localStorage.getItem("vd_session")); } catch { return null; } },
   saveSession(s) { localStorage.setItem("vd_session", JSON.stringify(s)); },
   clearSession() { localStorage.removeItem("vd_session"); },
 };
 
 const DB = {
   async getPrograms(userId, token) {
-    const r = await fetch(`${SB_URL}/rest/v1/programs?user_id=eq.${userId}&select=*`, {
-      headers: authHeaders(token),
-    });
+    const r = await fetch(`${SB_URL}/rest/v1/programs?user_id=eq.${userId}&select=*`, {headers:authHeaders(token)});
     return r.ok ? r.json() : [];
   },
   async upsert(id, userId, data, token) {
-    await fetch(`${SB_URL}/rest/v1/programs`, {
-      method: "POST",
-      headers: { ...authHeaders(token), "Prefer": "resolution=merge-duplicates" },
-      body: JSON.stringify({ id, user_id: userId, data }),
-    });
+    await fetch(`${SB_URL}/rest/v1/programs`, {method:"POST",headers:{...authHeaders(token),"Prefer":"resolution=merge-duplicates"},body:JSON.stringify({id,user_id:userId,data})});
   },
   async delete(id, userId, token) {
-    await fetch(`${SB_URL}/rest/v1/programs?id=eq.${id}&user_id=eq.${userId}`, {
-      method: "DELETE",
-      headers: authHeaders(token),
+    await fetch(`${SB_URL}/rest/v1/programs?id=eq.${id}&user_id=eq.${userId}`, {method:"DELETE",headers:authHeaders(token)});
+  },
+  // ── ABONNEMENTS
+  async getSubscription(userId, token) {
+    const r = await fetch(`${SB_URL}/rest/v1/subscriptions?user_id=eq.${userId}&order=created_at.desc&limit=1`, {headers:authHeaders(token)});
+    const data = r.ok ? await r.json() : [];
+    return data[0] || null;
+  },
+  async createSubscription(userId, email, expiresAt, token) {
+    await fetch(`${SB_URL}/rest/v1/subscriptions`, {
+      method:"POST",
+      headers:{...authHeaders(token),"Prefer":"resolution=merge-duplicates"},
+      body:JSON.stringify({user_id:userId, email, expires_at:expiresAt, status:"active"})
     });
+  },
+  // ── CODES D'ACCÈS
+  async getCode(code) {
+    const r = await fetch(`${SB_URL}/rest/v1/access_codes?code=eq.${code}&select=*`, {headers:authHeaders()});
+    const data = r.ok ? await r.json() : [];
+    return data[0] || null;
+  },
+  async markCodeUsed(code, email, token) {
+    await fetch(`${SB_URL}/rest/v1/access_codes?code=eq.${code}`, {
+      method:"PATCH",
+      headers:authHeaders(token),
+      body:JSON.stringify({used:true, used_at:new Date().toISOString(), email})
+    });
+  },
+  async createCode(code, expiresAt, token) {
+    await fetch(`${SB_URL}/rest/v1/access_codes`, {
+      method:"POST",
+      headers:authHeaders(token),
+      body:JSON.stringify({code, expires_at:expiresAt, used:false})
+    });
+  },
+  async getAllCodes(token) {
+    const r = await fetch(`${SB_URL}/rest/v1/access_codes?order=created_at.desc`, {headers:authHeaders(token)});
+    return r.ok ? r.json() : [];
   },
 };
 
@@ -77,11 +87,13 @@ const todayLabel = () => { const d=new Date(); return `${DAYS_FR[d.getDay()]} ${
 const todayKey   = () => { const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
 const getSeed    = () => { const d=new Date(); return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); };
 const daysDiff   = (from,to) => { const p=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);}; return Math.floor((p(to)-p(from))/864e5); };
+const formatDate = (iso) => { const d=new Date(iso); return `${d.getDate()} ${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`; };
+const addDays    = (days) => { const d=new Date(); d.setDate(d.getDate()+days); return d.toISOString(); };
+const genCode    = () => Math.random().toString(36).substring(2,8).toUpperCase()+"-"+Math.random().toString(36).substring(2,6).toUpperCase();
 
-// ── SITUATIONS ────────────────────────────────────────────────────────────────
 const SITS = [
   {icon:"🙏",label:"Paix intérieure",c:"#7C3AED"},{icon:"💪",label:"Force & Courage",c:"#EA580C"},
-  {icon:"❤️",label:"Guérison",c:"#DC2626"},{icon:"👨‍👩‍👧",label:"Ma famille",c:"#059669"},
+  {icon:"❤️",label:"Guérison",c:"#DC2626"},{icon:"👨👩👧",label:"Ma famille",c:"#059669"},
   {icon:"💼",label:"Travail & Finances",c:"#2563EB"},{icon:"🛡️",label:"Protection divine",c:"#B45309"},
   {icon:"💔",label:"Deuil & Douleur",c:"#7C3AED"},{icon:"🌅",label:"Nouveau départ",c:"#DB2777"},
   {icon:"😔",label:"Anxiété & Peur",c:"#4F46E5"},{icon:"🤝",label:"Réconciliation",c:"#0D9488"},
@@ -90,31 +102,25 @@ const SITS = [
   {icon:"🎓",label:"Études & Sagesse",c:"#0369A1"},{icon:"🏥",label:"Maladie grave",c:"#B91C1C"},
 ];
 
-// ── LOCAL CACHE ───────────────────────────────────────────────────────────────
 const LS = {
   get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
 };
 
-// ── CLAUDE ────────────────────────────────────────────────────────────────────
 const SYS = `Tu es un pasteur chrétien inspiré, profond et bienveillant (tradition évangélique/charismatique).
 Français riche, biblique, contemporain. Tutoiement pastoral.
 Jamais de labels ou métadonnées dans la réponse. Direct, puissant, plein d'espérance.`;
 async function ai(prompt, max=1000) {
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST", headers:{
-  "Content-Type":"application/json",
-  "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY,
-  "anthropic-version": "2023-06-01"
-},
-      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:max, system:SYS, messages:[{role:"user",content:prompt}] }),
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:max,system:SYS,messages:[{role:"user",content:prompt}]}),
     });
     return (await r.json()).content?.[0]?.text ?? "Erreur.";
   } catch { return "Erreur réseau."; }
 }
 
-// ── THEME ─────────────────────────────────────────────────────────────────────
 const T = {
   bgGrad:"linear-gradient(160deg,#F8F4EE 0%,#EDE5D8 100%)",
   card:"#FFFDF8", cardBorder:"rgba(180,140,60,.22)", cardShadow:"0 4px 24px rgba(120,80,20,.10)",
@@ -144,7 +150,6 @@ function CopyBtn({text,dark=false}){
 }
 function SL({children}){return <p style={{fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:3,color:T.textMuted,textTransform:"uppercase",marginBottom:11}}>{children}</p>;}
 function Divider(){return <div style={{display:"flex",alignItems:"center",gap:12,margin:"20px 0"}}><div style={{flex:1,height:1,background:`linear-gradient(90deg,transparent,${T.goldBorder})`}}/><span style={{color:"#D4AF37",fontSize:13}}>✦</span><div style={{flex:1,height:1,background:`linear-gradient(90deg,${T.goldBorder},transparent)`}}/></div>;}
-
 function TeachCard({title,body,badge}){
   return <div style={{background:T.teachBg,border:"1px solid rgba(80,180,80,.2)",borderRadius:20,padding:"24px 20px 18px",boxShadow:"0 6px 30px rgba(10,40,10,.25)"}}>
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><span>📖</span><span style={{fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:3,color:"#6EE7A0",textTransform:"uppercase"}}>{badge}</span></div>
@@ -170,25 +175,25 @@ function SitCard({body,badge,icon,color}){
 
 // ── AUTH SCREEN ───────────────────────────────────────────────────────────────
 function AuthScreen({onLogin}){
-  const [mode,setMode]=useState("login");
-  const [email,setEmail]=useState("");
-  const [pass,setPass]=useState("");
-  const [name,setName]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [msg,setMsg]=useState(null);
+  const[mode,setMode]=useState("login");
+  const[email,setEmail]=useState("");
+  const[pass,setPass]=useState("");
+  const[name,setName]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[msg,setMsg]=useState(null);
 
   async function submit(){
     if(!email.trim()||(mode!=="reset"&&!pass.trim())) return;
     setLoading(true); setMsg(null);
     try{
       if(mode==="login"){
-        const data = await Auth.signIn(email,pass);
+        const data=await Auth.signIn(email,pass);
         if(data.error||!data.access_token) setMsg({t:"e",x:"Email ou mot de passe incorrect."});
         else { Auth.saveSession(data); onLogin(data); }
       } else if(mode==="signup"){
-        const data = await Auth.signUp(email,pass,name);
+        const data=await Auth.signUp(email,pass,name);
         if(data.error) setMsg({t:"e",x:data.error.message?.includes("already")?"Cet email est déjà utilisé.":"Erreur lors de l'inscription."});
-        else if(data.user) { const si=await Auth.signIn(email,pass); if(si.access_token){Auth.saveSession(si);onLogin(si);} else setMsg({t:"s",x:"Compte créé ! Connecte-toi."}); }
+        else if(data.user){ const si=await Auth.signIn(email,pass); if(si.access_token){Auth.saveSession(si);onLogin(si);} else setMsg({t:"s",x:"Compte créé ! Connecte-toi."}); }
         else setMsg({t:"s",x:"Vérifie ton email pour confirmer ton compte."});
       } else {
         await Auth.resetPassword(email);
@@ -198,19 +203,18 @@ function AuthScreen({onLogin}){
     setLoading(false);
   }
 
-  const inp={width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,215,0,.2)",borderRadius:11,padding:"12px 14px",color:"#fff",fontFamily:"'EB Garamond',serif",fontSize:15,outline:"none",marginTop:0};
+  const inp={width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,215,0,.2)",borderRadius:11,padding:"12px 14px",color:"#fff",fontFamily:"'EB Garamond',serif",fontSize:15,outline:"none"};
   const lbl={fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:3,color:"rgba(255,215,0,.6)",textTransform:"uppercase",display:"block",marginBottom:7};
 
   return(
     <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#2D1A6E 0%,#1A0E4E 50%,#0D0830 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
       <div style={{textAlign:"center",marginBottom:30}}>
         <div style={{fontSize:52,marginBottom:10,filter:"drop-shadow(0 0 22px rgba(255,215,0,.7))"}}>✝</div>
-        <h1 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:22,color:"#FFD700",margin:"0 0 6px",letterSpacing:2}}>Voyageur Divin</h1>
-        <p style={{fontFamily:"'EB Garamond',serif",fontSize:15,fontStyle:"italic",color:"rgba(255,255,255,.45)",margin:0}}>Ton compagnon spirituel quotidien</p>
+        <h1 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:22,color:"#FFD700",margin:"0 0 6px",letterSpacing:2}}>Le Sanctuaire</h1>
+        <p style={{fontFamily:"'EB Garamond',serif",fontSize:15,fontStyle:"italic",color:"rgba(255,255,255,.45)",margin:0}}>Entre. Dieu t'attendait.</p>
       </div>
-
       <div style={{background:"rgba(255,255,255,.07)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,215,0,.2)",borderRadius:24,padding:"30px 26px",width:"100%",maxWidth:400}}>
-        {mode!=="reset" && (
+        {mode!=="reset"&&(
           <div style={{display:"flex",background:"rgba(0,0,0,.2)",borderRadius:12,padding:3,marginBottom:24}}>
             {["login","signup"].map(m=>(
               <button key={m} onClick={()=>{setMode(m);setMsg(null);}} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",transition:"all .3s",background:mode===m?"rgba(255,215,0,.15)":"transparent",color:mode===m?"#FFD700":"rgba(255,255,255,.35)",fontFamily:"'Cinzel',serif",fontSize:11,letterSpacing:2}}>
@@ -219,36 +223,214 @@ function AuthScreen({onLogin}){
             ))}
           </div>
         )}
-
-        {mode==="reset" && (
+        {mode==="reset"&&(
           <div style={{marginBottom:20}}>
             <button onClick={()=>{setMode("login");setMsg(null);}} style={{background:"transparent",border:"none",color:"rgba(255,215,0,.5)",fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,cursor:"pointer"}}>‹ Retour</button>
             <p style={{fontFamily:"'Cinzel Decorative',serif",fontSize:16,color:"#FFD700",marginTop:10,marginBottom:0}}>Mot de passe oublié</p>
           </div>
         )}
-
-        {mode==="signup" && <div style={{marginBottom:14}}><label style={lbl}>Ton prénom</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Marie" style={inp}/></div>}
-
+        {mode==="signup"&&<div style={{marginBottom:14}}><label style={lbl}>Ton prénom</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Marie" style={inp}/></div>}
         <div style={{marginBottom:14}}><label style={lbl}>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com" style={inp}/></div>
-
-        {mode!=="reset" && (
+        {mode!=="reset"&&(
           <div style={{marginBottom:18}}>
             <label style={lbl}>Mot de passe</label>
             <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&submit()} style={inp}/>
-            {mode==="login" && <button onClick={()=>{setMode("reset");setMsg(null);}} style={{background:"transparent",border:"none",color:"rgba(255,215,0,.35)",fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:1,cursor:"pointer",marginTop:6,display:"block"}}>Mot de passe oublié ?</button>}
+            {mode==="login"&&<button onClick={()=>{setMode("reset");setMsg(null);}} style={{background:"transparent",border:"none",color:"rgba(255,215,0,.35)",fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:1,cursor:"pointer",marginTop:6,display:"block"}}>Mot de passe oublié ?</button>}
           </div>
         )}
-
-        {msg && <div style={{background:msg.t==="e"?"rgba(185,28,28,.2)":"rgba(21,128,61,.2)",border:`1px solid ${msg.t==="e"?"#F87171":"#4ADE80"}`,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
+        {msg&&<div style={{background:msg.t==="e"?"rgba(185,28,28,.2)":"rgba(21,128,61,.2)",border:`1px solid ${msg.t==="e"?"#F87171":"#4ADE80"}`,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
           <p style={{fontFamily:"'EB Garamond',serif",fontSize:14,color:msg.t==="e"?"#FCA5A5":"#86EFAC",margin:0}}>{msg.x}</p>
         </div>}
-
         <button onClick={submit} disabled={loading} style={{width:"100%",padding:"15px",borderRadius:13,border:"none",cursor:loading?"not-allowed":"pointer",background:"linear-gradient(135deg,#D4AF37,#B8930A)",color:"#0D0A1E",fontFamily:"'Cinzel',serif",fontSize:12,letterSpacing:2,fontWeight:700,boxShadow:"0 4px 18px rgba(184,134,11,.4)",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
           {loading?<Spinner size={20} color="#0D0A1E"/>:(mode==="login"?"✦ Se connecter":mode==="signup"?"✦ Créer mon compte":"✦ Envoyer le lien")}
         </button>
       </div>
-
       <p style={{fontFamily:"'EB Garamond',serif",fontSize:12,fontStyle:"italic",color:"rgba(255,255,255,.2)",marginTop:20,textAlign:"center"}}>✦ Tes données sont privées et sécurisées ✦</p>
+    </div>
+  );
+}
+
+// ── CODE SCREEN (entrer code d'accès) ─────────────────────────────────────────
+function CodeScreen({session, onActivated, expired}){
+  const[code,setCode]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[msg,setMsg]=useState(null);
+
+  async function activate(){
+    if(!code.trim()) return;
+    setLoading(true); setMsg(null);
+    try{
+      const entry = await DB.getCode(code.trim().toUpperCase());
+      if(!entry) { setMsg({t:"e",x:"Code invalide. Vérifie le code reçu."}); setLoading(false); return; }
+      if(entry.used) { setMsg({t:"e",x:"Ce code a déjà été utilisé."}); setLoading(false); return; }
+      if(new Date(entry.expires_at) < new Date()) { setMsg({t:"e",x:"Ce code a expiré. Contacte-nous pour en obtenir un nouveau."}); setLoading(false); return; }
+      // Activer l'abonnement 30 jours
+      const expiresAt = addDays(30);
+      await DB.createSubscription(session.user.id, session.user.email, expiresAt, session.access_token);
+      await DB.markCodeUsed(code.trim().toUpperCase(), session.user.email, session.access_token);
+      setMsg({t:"s",x:"🎉 Abonnement activé ! Bienvenue dans Le Sanctuaire !"});
+      setTimeout(()=>onActivated(), 1500);
+    }catch{ setMsg({t:"e",x:"Erreur réseau. Réessaie."}); }
+    setLoading(false);
+  }
+
+  return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#2D1A6E 0%,#1A0E4E 50%,#0D0830 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+      <div style={{textAlign:"center",marginBottom:30}}>
+        <div style={{fontSize:52,marginBottom:10,filter:"drop-shadow(0 0 22px rgba(255,215,0,.7))"}}>🔑</div>
+        <h1 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:20,color:"#FFD700",margin:"0 0 8px",letterSpacing:2}}>
+          {expired ? "Abonnement expiré" : "Code d'accès"}
+        </h1>
+        <p style={{fontFamily:"'EB Garamond',serif",fontSize:15,fontStyle:"italic",color:"rgba(255,255,255,.5)",margin:0,maxWidth:320,lineHeight:1.6}}>
+          {expired
+            ? "Ton abonnement a expiré. Entre ton nouveau code pour continuer à accéder au Sanctuaire."
+            : "Entre le code d'accès reçu après ton paiement pour activer ton abonnement de 30 jours."
+          }
+        </p>
+      </div>
+
+      <div style={{background:"rgba(255,255,255,.07)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,215,0,.2)",borderRadius:24,padding:"30px 26px",width:"100%",maxWidth:400}}>
+        <label style={{fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:3,color:"rgba(255,215,0,.6)",textTransform:"uppercase",display:"block",marginBottom:7}}>Ton code d'accès</label>
+        <input
+          value={code} onChange={e=>setCode(e.target.value.toUpperCase())}
+          placeholder="EX: ABC123-XY45"
+          onKeyDown={e=>e.key==="Enter"&&activate()}
+          style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:11,padding:"14px",color:"#FFD700",fontFamily:"'Cinzel',serif",fontSize:16,outline:"none",letterSpacing:3,textAlign:"center",marginBottom:20}}
+        />
+
+        {msg&&<div style={{background:msg.t==="e"?"rgba(185,28,28,.2)":"rgba(21,128,61,.2)",border:`1px solid ${msg.t==="e"?"#F87171":"#4ADE80"}`,borderRadius:10,padding:"10px 14px",marginBottom:16}}>
+          <p style={{fontFamily:"'EB Garamond',serif",fontSize:14,color:msg.t==="e"?"#FCA5A5":"#86EFAC",margin:0}}>{msg.x}</p>
+        </div>}
+
+        <button onClick={activate} disabled={loading||!code.trim()} style={{width:"100%",padding:"15px",borderRadius:13,border:"none",cursor:loading||!code.trim()?"not-allowed":"pointer",background:code.trim()?"linear-gradient(135deg,#D4AF37,#B8930A)":"rgba(255,255,255,.1)",color:code.trim()?"#0D0A1E":"rgba(255,255,255,.3)",fontFamily:"'Cinzel',serif",fontSize:12,letterSpacing:2,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+          {loading?<Spinner size={20} color="#0D0A1E"/>:"✦ Activer mon accès"}
+        </button>
+
+        <div style={{marginTop:20,padding:"14px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.15)",borderRadius:12}}>
+          <p style={{fontFamily:"'EB Garamond',serif",fontSize:13,color:"rgba(255,215,0,.6)",margin:0,textAlign:"center",lineHeight:1.6}}>
+            Pas encore de code ? Abonne-toi à <strong style={{color:"#FFD700"}}>Le Sanctuaire</strong> pour seulement <strong style={{color:"#FFD700"}}>9,99€/mois</strong> et participe à l'avancement de l'œuvre de Dieu. 🙏
+          </p>
+        </div>
+      </div>
+
+      <button onClick={()=>{Auth.clearSession();window.location.reload();}} style={{marginTop:20,background:"transparent",border:"none",color:"rgba(255,255,255,.25)",fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,cursor:"pointer"}}>
+        Se déconnecter
+      </button>
+    </div>
+  );
+}
+
+// ── ADMIN SCREEN ──────────────────────────────────────────────────────────────
+function AdminScreen({session}){
+  const[codes,setCodes]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[generating,setGenerating]=useState(false);
+  const[newCode,setNewCode]=useState(null);
+  const[copied,setCopied]=useState(false);
+
+  useEffect(()=>{
+    DB.getAllCodes(session.access_token).then(data=>{
+      if(Array.isArray(data)) setCodes(data);
+      setLoading(false);
+    });
+  },[]);
+
+  async function generateCode(){
+    setGenerating(true);
+    const code = genCode();
+    const expiresAt = addDays(35); // 35 jours pour avoir le temps d'envoyer
+    await DB.createCode(code, expiresAt, session.access_token);
+    setNewCode(code);
+    const updated = await DB.getAllCodes(session.access_token);
+    if(Array.isArray(updated)) setCodes(updated);
+    setGenerating(false);
+  }
+
+  function copyCode(code){
+    navigator.clipboard.writeText(code);
+    setCopied(code);
+    setTimeout(()=>setCopied(null),2000);
+  }
+
+  const available = codes.filter(c=>!c.used&&new Date(c.expires_at)>new Date());
+  const used      = codes.filter(c=>c.used);
+  const expired   = codes.filter(c=>!c.used&&new Date(c.expires_at)<=new Date());
+
+  return(
+    <div style={{paddingTop:22}}>
+      <div style={{textAlign:"center",marginBottom:24,padding:"20px",background:"linear-gradient(135deg,#2D1A6E,#1A0E4E)",borderRadius:20,border:"1px solid rgba(255,215,0,.2)"}}>
+        <div style={{fontSize:32,marginBottom:8}}>⚙️</div>
+        <h2 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:16,color:"#FFD700",margin:"0 0 4px"}}>Panel Admin</h2>
+        <p style={{fontFamily:"'EB Garamond',serif",fontSize:13,fontStyle:"italic",color:"rgba(255,255,255,.45)",margin:0}}>Gestion des codes d'accès</p>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+        {[{label:"Disponibles",val:available.length,c:"#15803D"},{label:"Utilisés",val:used.length,c:"#2563EB"},{label:"Expirés",val:expired.length,c:"#B91C1C"}].map(s=>(
+          <div key={s.label} style={{background:T.card,border:`1px solid ${s.c}30`,borderRadius:14,padding:"14px",textAlign:"center",boxShadow:T.cardShadow}}>
+            <p style={{fontFamily:"'Cinzel Decorative',serif",fontSize:22,color:s.c,margin:"0 0 4px"}}>{s.val}</p>
+            <p style={{fontFamily:"'Cinzel',serif",fontSize:9,color:T.textMuted,letterSpacing:2,margin:0,textTransform:"uppercase"}}>{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Générer un code */}
+      <div style={{background:T.card,border:`1px solid ${T.cardBorder}`,borderRadius:16,padding:"20px",marginBottom:20,boxShadow:T.cardShadow}}>
+        <p style={{fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:3,color:T.gold,marginBottom:14,textTransform:"uppercase"}}>✦ Générer un nouveau code</p>
+
+        {newCode&&(
+          <div style={{background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:12,padding:"16px",marginBottom:14,textAlign:"center"}}>
+            <p style={{fontFamily:"'Cinzel',serif",fontSize:11,color:"#15803D",margin:"0 0 8px",letterSpacing:2}}>NOUVEAU CODE GÉNÉRÉ</p>
+            <p style={{fontFamily:"'Cinzel',serif",fontSize:22,color:"#15803D",margin:"0 0 10px",letterSpacing:4,fontWeight:700}}>{newCode}</p>
+            <button onClick={()=>copyCode(newCode)} style={{background:"#15803D",border:"none",borderRadius:20,padding:"8px 20px",cursor:"pointer",color:"#fff",fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2}}>
+              {copied===newCode?"✓ Copié !":"Copier le code"}
+            </button>
+          </div>
+        )}
+
+        <button onClick={generateCode} disabled={generating} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",cursor:generating?"not-allowed":"pointer",background:"linear-gradient(135deg,#2D1A6E,#1A0E4E)",color:"#FFD700",fontFamily:"'Cinzel',serif",fontSize:11,letterSpacing:2,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          {generating?<Spinner size={18} color="#FFD700"/>:"+ Générer un code"}
+        </button>
+        <p style={{fontFamily:"'EB Garamond',serif",fontSize:12,color:T.textMuted,margin:"10px 0 0",textAlign:"center",fontStyle:"italic"}}>
+          Génère un code après chaque paiement reçu sur Chariow → envoie-le au client par WhatsApp ou email
+        </p>
+      </div>
+
+      {/* Liste des codes disponibles */}
+      {available.length>0&&(
+        <div style={{marginBottom:20}}>
+          <p style={{fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:3,color:"#15803D",textTransform:"uppercase",marginBottom:12}}>✓ CODES DISPONIBLES ({available.length})</p>
+          {available.map(c=>(
+            <div key={c.id} style={{background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:12,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <p style={{fontFamily:"'Cinzel',serif",fontSize:14,color:"#15803D",margin:"0 0 3px",letterSpacing:2,fontWeight:700}}>{c.code}</p>
+                <p style={{fontFamily:"'Cinzel',serif",fontSize:9,color:"#4ADE80",margin:0,letterSpacing:1}}>Expire le {formatDate(c.expires_at)}</p>
+              </div>
+              <button onClick={()=>copyCode(c.code)} style={{background:"#15803D",border:"none",borderRadius:20,padding:"6px 14px",cursor:"pointer",color:"#fff",fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:1}}>
+                {copied===c.code?"✓":"Copier"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Codes utilisés */}
+      {used.length>0&&(
+        <div style={{marginBottom:20}}>
+          <p style={{fontFamily:"'Cinzel',serif",fontSize:9,letterSpacing:3,color:"#2563EB",textTransform:"uppercase",marginBottom:12}}>📧 CODES UTILISÉS ({used.length})</p>
+          {used.slice(0,10).map(c=>(
+            <div key={c.id} style={{background:T.card,border:`1px solid ${T.cardBorder}`,borderRadius:12,padding:"12px 16px",marginBottom:8,boxShadow:T.cardShadow}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <p style={{fontFamily:"'Cinzel',serif",fontSize:13,color:T.textSub,margin:"0 0 3px",letterSpacing:2}}>{c.code}</p>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:9,color:"#2563EB",letterSpacing:1}}>✓ Utilisé</span>
+              </div>
+              {c.email&&<p style={{fontFamily:"'EB Garamond',serif",fontSize:13,color:T.textMuted,margin:0}}>{c.email}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loading&&<div style={{textAlign:"center",padding:"30px 0"}}><Spinner size={36}/></div>}
     </div>
   );
 }
@@ -295,7 +477,7 @@ function TodayTab(){
     <div style={{paddingTop:20}}>
       <div style={{textAlign:"center",marginBottom:24,padding:"24px 14px",background:"linear-gradient(135deg,#2D1A6E,#1A0E4E)",border:"1px solid rgba(212,175,55,.3)",borderRadius:22,boxShadow:"0 8px 32px rgba(30,10,90,.25)"}}>
         <div style={{fontSize:46,marginBottom:10,filter:"drop-shadow(0 0 18px rgba(255,215,0,.6))"}}>✝</div>
-        <h1 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:21,color:"#FFD700",margin:"0 0 14px",letterSpacing:2}}>Voyageur Divin</h1>
+        <h1 style={{fontFamily:"'Cinzel Decorative',serif",fontSize:21,color:"#FFD700",margin:"0 0 14px",letterSpacing:2}}>Le Sanctuaire</h1>
         <div style={{display:"inline-block",background:"rgba(255,215,0,.12)",border:"1px solid rgba(255,215,0,.3)",borderRadius:12,padding:"9px 22px"}}>
           <p style={{fontFamily:"'Cinzel',serif",fontSize:13,letterSpacing:2,color:"#FFD700",margin:0,textTransform:"uppercase"}}>{tl}</p>
         </div>
@@ -368,7 +550,6 @@ function ProgramsTab({userId,token}){
     setSit("");setProblem("");setCreating(false);setSelId(id);setAdvOpen(true);setView("detail");
   }
 
-  // DETAIL
   if(view==="detail"&&selId&&programs[selId]){
     const prog=programs[selId],di=getDayIdx(prog),color=prog.sit.c;
     return(
@@ -416,7 +597,6 @@ function ProgramsTab({userId,token}){
     );
   }
 
-  // NEW FORM
   if(view==="new") return(
     <div style={{paddingTop:22}}>
       <button onClick={()=>setView("list")} style={{background:"transparent",border:`1px solid ${T.goldBorder}`,borderRadius:20,color:T.gold,fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,cursor:"pointer",marginBottom:18,padding:"6px 14px",display:"flex",alignItems:"center",gap:6}}>‹ Retour</button>
@@ -433,7 +613,6 @@ function ProgramsTab({userId,token}){
     </div>
   );
 
-  // LIST
   if(loadingProgs) return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"60px 0",gap:16}}><Spinner size={40}/><p style={{fontFamily:"'EB Garamond',serif",fontSize:15,fontStyle:"italic",color:T.textMuted}}>Chargement de tes programmes…</p></div>;
 
   const list=Object.values(programs).sort((a,b)=>Number(b.id)-Number(a.id));
@@ -467,14 +646,52 @@ function ProgramsTab({userId,token}){
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function App(){
   const[session,setSession]=useState(()=>Auth.getSession());
+  const[subscription,setSubscription]=useState(null);
+  const[checkingSubscription,setCheckingSubscription]=useState(false);
   const[tab,setTab]=useState(0);
 
-  function handleLogin(data){ Auth.saveSession(data); setSession(data); }
-  async function handleLogout(){ await Auth.signOut(session?.access_token); Auth.clearSession(); setSession(null); }
+  const isAdmin = session?.user?.email === ADMIN_EMAIL;
 
+  // Vérifier l'abonnement après connexion
+  useEffect(()=>{
+    if(!session?.access_token||isAdmin) return;
+    setCheckingSubscription(true);
+    DB.getSubscription(session.user.id, session.access_token).then(sub=>{
+      setSubscription(sub);
+      setCheckingSubscription(false);
+    });
+  },[session]);
+
+  function handleLogin(data){ Auth.saveSession(data); setSession(data); }
+  async function handleLogout(){ await Auth.signOut(session?.access_token); Auth.clearSession(); setSession(null); setSubscription(null); }
+  function handleActivated(){ DB.getSubscription(session.user.id, session.access_token).then(sub=>setSubscription(sub)); }
+
+  // Pas connecté
   if(!session?.access_token) return <AuthScreen onLogin={handleLogin}/>;
 
+  // Vérification en cours
+  if(checkingSubscription) return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#2D1A6E,#1A0E4E,#0D0830)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:20}}>
+      <div style={{fontSize:52,filter:"drop-shadow(0 0 22px rgba(255,215,0,.7))"}}>✝</div>
+      <Spinner size={40} color="#FFD700"/>
+      <p style={{fontFamily:"'EB Garamond',serif",fontSize:15,fontStyle:"italic",color:"rgba(255,255,255,.4)"}}>Vérification de ton accès…</p>
+    </div>
+  );
+
+  // Pas d'abonnement ou expiré (sauf admin)
+  if(!isAdmin){
+    const isExpired = subscription && new Date(subscription.expires_at) < new Date();
+    const hasNoSub  = !subscription;
+    if(hasNoSub || isExpired){
+      return <CodeScreen session={session} onActivated={handleActivated} expired={isExpired}/>;
+    }
+  }
+
   const user = session.user;
+  const subExpiry = subscription ? formatDate(subscription.expires_at) : null;
+  const tabs = isAdmin
+    ? [{i:"✝",l:"Aujourd'hui"},{i:"📿",l:"Programmes"},{i:"⚙️",l:"Admin"}]
+    : [{i:"✝",l:"Aujourd'hui"},{i:"📿",l:"Programmes"}];
 
   return(
     <>
@@ -493,7 +710,7 @@ export default function App(){
       `}</style>
       <div style={{minHeight:"100vh",background:T.bgGrad,color:T.textMain,maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column"}}>
         <div style={{position:"sticky",top:0,zIndex:200,background:T.nav,borderBottom:`1px solid ${T.navBorder}`,display:"flex",boxShadow:"0 2px 12px rgba(0,0,0,.2)"}}>
-          {[{i:"✝",l:"Aujourd'hui"},{i:"📿",l:"Mes Programmes"}].map((t,idx)=>(
+          {tabs.map((t,idx)=>(
             <button key={idx} onClick={()=>setTab(idx)} style={{flex:1,padding:"13px 8px",background:"transparent",border:"none",borderBottom:`3px solid ${tab===idx?"#FFD700":"transparent"}`,display:"flex",alignItems:"center",justifyContent:"center",gap:7,cursor:"pointer",transition:"all .3s"}}>
               <span style={{fontSize:16,opacity:tab===idx?1:.4}}>{t.i}</span>
               <span style={{fontFamily:"'Cinzel',serif",fontSize:10,letterSpacing:2,color:tab===idx?"#FFD700":"rgba(245,240,232,.35)",transition:"color .3s"}}>{t.l}</span>
@@ -504,9 +721,12 @@ export default function App(){
         <div style={{flex:1,padding:"0 17px 80px",overflowY:"auto"}}>
           {tab===0&&<TodayTab/>}
           {tab===1&&<ProgramsTab userId={user.id} token={session.access_token}/>}
+          {tab===2&&isAdmin&&<AdminScreen session={session}/>}
         </div>
         <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:T.nav,borderTop:`1px solid ${T.navBorder}`,padding:"9px 0 15px",textAlign:"center"}}>
-          <p style={{fontFamily:"'Cinzel',serif",fontSize:8,letterSpacing:3,color:"rgba(212,175,55,.35)",textTransform:"uppercase"}}>✦ Voyageur Divine · {user.email} ✦</p>
+          <p style={{fontFamily:"'Cinzel',serif",fontSize:8,letterSpacing:2,color:"rgba(212,175,55,.35)",textTransform:"uppercase"}}>
+            {isAdmin ? "✦ Admin · Le Sanctuaire ✦" : `✦ Accès jusqu'au ${subExpiry} ✦`}
+          </p>
         </div>
       </div>
     </>
