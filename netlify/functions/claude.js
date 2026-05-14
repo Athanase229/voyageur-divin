@@ -2,7 +2,7 @@ export async function handler(event) {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      body: "Method Not Allowed"
+      body: "Method Not Allowed",
     };
   }
 
@@ -14,28 +14,28 @@ export async function handler(event) {
       headers: {
         "Content-Type": "application/json",
         "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
+        "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
 
     return {
-      statusCode: response.status,
+      statusCode: 200,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Content-Type": "application/json"
+        "Access-Control-Allow-Headers": "Content-Type",
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     };
-
   } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        error: error.message
-      })
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({ error: error.message }),
     };
   }
 }
