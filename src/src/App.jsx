@@ -110,15 +110,38 @@ const LS = {
 const SYS = `Tu es un pasteur chrétien inspiré, profond et bienveillant (tradition évangélique/charismatique).
 Français riche, biblique, contemporain. Tutoiement pastoral.
 Jamais de labels ou métadonnées dans la réponse. Direct, puissant, plein d'espérance.`;
-async function ai(prompt, max=1000) {
+async function ai(prompt, max = 1000) {
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST",
-      headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
-      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:max,system:SYS,messages:[{role:"user",content:prompt}]}),
+    const r = await fetch("/.netlify/functions/claude", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: max,
+        system: SYS,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      })
     });
-    return (await r.json()).content?.[0]?.text ?? "Erreur.";
-  } catch { return "Erreur réseau."; }
+
+    const data = await r.json();
+
+    if (!r.ok) {
+      console.error("Erreur Claude:", data);
+      return "Une erreur est survenue.";
+    }
+
+    return data?.content?.[0]?.text || "Aucune réponse générée.";
+  } catch (error) {
+    console.error(error);
+    return "Erreur réseau.";
+  }
 }
 
 const T = {
