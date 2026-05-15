@@ -1,10 +1,10 @@
 [build]
   base = "src"
   command = "npm install && npm run build"
-  publish = "src/dist"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "18"
 
 [functions]
-  directory = "src/netlify/functions"
+  directory = "netlify/functions"
