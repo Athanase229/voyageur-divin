@@ -1,21 +1,14 @@
 export async function handler(event) {
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Content-Type": "application/json"
-  };
-
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 200, headers, body: "" };
-  }
-
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers, body: "Method Not Allowed" };
+    return {
+      statusCode: 405,
+      body: "Method Not Allowed"
+    };
   }
 
   try {
     const body = JSON.parse(event.body);
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -27,13 +20,29 @@ export async function handler(event) {
     });
 
     const data = await response.json();
-    return { statusCode: 200, headers, body: JSON.stringify(data) };
+
+    console.log("CLAUDE RESPONSE:", JSON.stringify(data));
+
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        text: data?.content?.[0]?.text || null,
+        raw: data
+      })
+    };
 
   } catch (error) {
+    console.error("SERVER ERROR:", error);
+
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({
+        error: error.message
+      })
     };
   }
 }
