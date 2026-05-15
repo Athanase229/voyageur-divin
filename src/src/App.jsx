@@ -132,14 +132,25 @@ async function ai(prompt, max = 1000) {
 
     const data = await r.json();
 
+    console.log("REPONSE API :", data);
+
     if (!r.ok) {
       console.error("Erreur Claude:", data);
-      return "Une erreur est survenue.";
+      return "Erreur Claude API";
     }
 
-    return data?.text || "Aucune réponse générée.";
+    if (data.text) {
+      return data.text;
+    }
+
+    if (data.raw?.content?.[0]?.text) {
+      return data.raw.content[0].text;
+    }
+
+    return JSON.stringify(data);
+
   } catch (error) {
-    console.error(error);
+    console.error("Erreur réseau:", error);
     return "Erreur réseau.";
   }
 }
