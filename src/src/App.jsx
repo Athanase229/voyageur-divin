@@ -137,7 +137,7 @@ async function ai(prompt, max = 1000) {
       return "Une erreur est survenue.";
     }
 
-    return data?.content?.[0]?.text || "Aucune réponse générée.";
+    return data?.text || "Aucune réponse générée.";
   } catch (error) {
     console.error(error);
     return "Erreur réseau.";
