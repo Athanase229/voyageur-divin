@@ -139,15 +139,13 @@ async function ai(prompt, max = 1000) {
       return "Erreur Claude API";
     }
 
-    if (data.text) {
-      return data.text;
-    }
+   console.log("DATA COMPLETE :", data);
 
-    if (data.raw?.content?.[0]?.text) {
-      return data.raw.content[0].text;
-    }
-
-    return JSON.stringify(data);
+return (
+  data?.text ||
+  data?.raw?.content?.[0]?.text ||
+  "Aucune réponse générée."
+);
 
   } catch (error) {
     console.error("Erreur réseau:", error);
