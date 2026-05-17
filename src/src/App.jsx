@@ -34,51 +34,86 @@ const DB = {
   async getPrograms() {
     return [];
   },
+
   async upsert() {
-  return true;
-},
-  async delete(id, userId, token) {
-    await fetch(`${SB_URL}/rest/v1/programs?id=eq.${id}&user_id=eq.${userId}`, {method:"DELETE",headers:authHeaders(token)});
+    return true;
   },
+
+  async delete() {
+    return true;
+  },
+
   // ── ABONNEMENTS
   async getSubscription(userId, token) {
-    const r = await fetch(`${SB_URL}/rest/v1/subscriptions?user_id=eq.${userId}&order=created_at.desc&limit=1`, {headers:authHeaders(token)});
+    const r = await fetch(
+      `${SB_URL}/rest/v1/subscriptions?user_id=eq.${userId}&order=created_at.desc&limit=1`,
+      { headers: authHeaders(token) }
+    );
+
     const data = r.ok ? await r.json() : [];
     return data[0] || null;
   },
+
   async createSubscription(userId, email, expiresAt, token) {
     await fetch(`${SB_URL}/rest/v1/subscriptions`, {
-      method:"POST",
-      headers:{...authHeaders(token),"Prefer":"resolution=merge-duplicates"},
-      body:JSON.stringify({user_id:userId, email, expires_at:expiresAt, status:"active"})
+      method: "POST",
+      headers: {
+        ...authHeaders(token),
+        "Prefer": "resolution=merge-duplicates"
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        email,
+        expires_at: expiresAt,
+        status: "active"
+      })
     });
   },
+
   // ── CODES D'ACCÈS
   async getCode(code) {
-    const r = await fetch(`${SB_URL}/rest/v1/access_codes?code=eq.${code}&select=*`, {headers:authHeaders()});
+    const r = await fetch(
+      `${SB_URL}/rest/v1/access_codes?code=eq.${code}&select=*`,
+      { headers: authHeaders() }
+    );
+
     const data = r.ok ? await r.json() : [];
     return data[0] || null;
   },
+
   async markCodeUsed(code, email, token) {
     await fetch(`${SB_URL}/rest/v1/access_codes?code=eq.${code}`, {
-      method:"PATCH",
-      headers:authHeaders(token),
-      body:JSON.stringify({used:true, used_at:new Date().toISOString(), email})
+      method: "PATCH",
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        used: true,
+        used_at: new Date().toISOString(),
+        email
+      })
     });
   },
+
   async createCode(code, expiresAt, token) {
     await fetch(`${SB_URL}/rest/v1/access_codes`, {
-      method:"POST",
-      headers:authHeaders(token),
-      body:JSON.stringify({code, expires_at:expiresAt, used:false})
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        code,
+        expires_at: expiresAt,
+        used: false
+      })
     });
   },
-  async getAllCodes(token) {
-    const r = await fetch(`${SB_URL}/rest/v1/access_codes?order=created_at.desc`, {headers:authHeaders(token)});
-    return r.ok ? r.json() : [];
-  },
-};
 
+  async getAllCodes(token) {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/access_codes?order=created_at.desc`,
+      { headers: authHeaders(token) }
+    );
+
+    return r.ok ? r.json() : [];
+  }
+};
 // ── DATE ──────────────────────────────────────────────────────────────────────
 const MONTHS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 const DAYS_FR   = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
