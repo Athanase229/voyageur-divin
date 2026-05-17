@@ -114,41 +114,21 @@ async function ai(prompt, max = 1000) {
   try {
     const r = await fetch("/.netlify/functions/claude", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: max,
         system: SYS,
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
+        messages: [{ role: "user", content: prompt }]
       })
     });
-
     const data = await r.json();
-
-    console.log("REPONSE API :", data);
-
-    if (!r.ok) {
-      console.error("Erreur Claude:", data);
-      return "Erreur Claude API";
-    }
-
-   console.log("DATA COMPLETE :", data);
-
-return (
-  data?.text ||
-  data?.raw?.content?.[0]?.text ||
-  "Aucune réponse générée."
-);
-
+    console.log("Réponse Claude:", JSON.stringify(data));
+    if (data?.content?.[0]?.text) return data.content[0].text;
+    if (data?.error) return "Erreur: " + data.error.message;
+    return "Aucune réponse.";
   } catch (error) {
-    console.error("Erreur réseau:", error);
+    console.error("Erreur:", error);
     return "Erreur réseau.";
   }
 }
