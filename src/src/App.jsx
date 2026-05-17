@@ -34,9 +34,9 @@ const DB = {
   async getPrograms() {
     return [];
   },
-  async upsert(id, userId, data, token) {
-    await fetch(`${SB_URL}/rest/v1/programs`, {method:"POST",headers:{...authHeaders(token),"Prefer":"resolution=merge-duplicates"},body:JSON.stringify({id,user_id:userId,data})});
-  },
+  async upsert() {
+  return true;
+},
   async delete(id, userId, token) {
     await fetch(`${SB_URL}/rest/v1/programs?id=eq.${id}&user_id=eq.${userId}`, {method:"DELETE",headers:authHeaders(token)});
   },
