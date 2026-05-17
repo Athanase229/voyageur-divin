@@ -31,9 +31,8 @@ const Auth = {
 };
 
 const DB = {
-  async getPrograms(userId, token) {
-    const r = await fetch(`${SB_URL}/rest/v1/programs?user_id=eq.${userId}&select=*`, {headers:authHeaders(token)});
-    return r.ok ? r.json() : [];
+  async getPrograms() {
+    return [];
   },
   async upsert(id, userId, data, token) {
     await fetch(`${SB_URL}/rest/v1/programs`, {method:"POST",headers:{...authHeaders(token),"Prefer":"resolution=merge-duplicates"},body:JSON.stringify({id,user_id:userId,data})});
